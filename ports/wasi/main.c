@@ -42,8 +42,7 @@
 #include "extmod/vfs.h"
 #include "extmod/vfs_posix.h"
 
-/* REPL 支持 */
-#include "shared/runtime/pyexec.h"
+/* REPL 已禁用 - 沙箱环境不需要交互式界面 */
 
 /* 栈顶指针，用于 GC 扫描栈 */
 static char *stack_top;

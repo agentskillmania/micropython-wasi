@@ -58,9 +58,7 @@ SRC_C = \
 	main.c \
 	mphalport.c \
 	modsocket.c \
-	shared/runtime/pyexec.c \
-	shared/runtime/stdout_helpers.c \
-	shared/readline/readline.c \
+	shared/runtime/stdout_helpers.c
 
 SRC_QSTR += $(SRC_C) $(SHARED_SRC_C)
 
