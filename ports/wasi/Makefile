@@ -45,6 +45,8 @@ INC += -I$(BUILD)
 CFLAGS += $(INC) -Wall -Werror -Wdouble-promotion -Wfloat-conversion -std=c99
 CFLAGS += -Os -DNDEBUG
 CFLAGS += -fdata-sections -ffunction-sections
+# 关键：启用异常处理并禁用旧版 EH，使用 wasip2 target
+CFLAGS += -target wasm32-wasip2
 CFLAGS += -mllvm -wasm-enable-sjlj -mllvm -wasm-use-legacy-eh=0
 
 LDFLAGS += -Wl,--gc-sections
