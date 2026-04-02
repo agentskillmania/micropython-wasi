@@ -1,0 +1,63 @@
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#include "py/builtin.h"
+#include "py/compile.h"
+#include "py/runtime.h"
+#include "py/repl.h"
+#include "py/gc.h"
+#include "py/mperrno.h"
+#include "py/mphal.h"
+#include "shared/runtime/pyexec.h"
+
+static char *stack_top;
+static char heap[MICROPY_HEAP_SIZE];
+
+int main(int argc, char **argv) {
+    int stack_dummy;
+    stack_top = (char *)&stack_dummy;
+
+    gc_init(heap, heap + sizeof(heap));
+    mp_init();
+
+    pyexec_friendly_repl();
+
+    mp_deinit();
+    return 0;
+}
+
+void gc_collect(void) {
+    void *dummy;
+    gc_collect_start();
+    gc_collect_root(&dummy, ((mp_uint_t)stack_top - (mp_uint_t)&dummy) / sizeof(mp_uint_t));
+    gc_collect_end();
+}
+
+mp_lexer_t *mp_lexer_new_from_file(qstr filename) {
+    mp_raise_OSError(MP_ENOENT);
+}
+
+mp_import_stat_t mp_import_stat(const char *path) {
+    return MP_IMPORT_STAT_NO_EXIST;
+}
+
+void nlr_jump_fail(void *val) {
+    while (1) {
+        ;
+    }
+}
+
+void MP_NORETURN __fatal_error(const char *msg) {
+    while (1) {
+        ;
+    }
+}
+
+#ifndef NDEBUG
+void MP_WEAK __assert_func(const char *file, int line, const char *func, const char *expr) {
+    printf("Assertion '%s' failed, at file %s:%d\n", expr, file, line);
+    __fatal_error("Assertion failed");
+}
+#endif
