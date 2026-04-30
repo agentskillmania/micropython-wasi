@@ -16,9 +16,21 @@
 #include <time.h>
 #include <errno.h>
 #include "py/mpconfig.h"
+#include "py/obj.h"
 
 int mp_hal_stdin_rx_chr(void);
 mp_uint_t mp_hal_stdout_tx_strn(const char *str, mp_uint_t len);
+
+// Time functions required by extmod/modtime.c
+struct _timeutils_struct_time_t;
+void mp_time_localtime_get(struct _timeutils_struct_time_t *tm);
+mp_obj_t mp_time_time_get(void);
+
+static inline uint64_t mp_hal_time_ns(void) {
+    struct timespec ts;
+    clock_gettime(CLOCK_REALTIME, &ts);
+    return (uint64_t)ts.tv_sec * 1000000000ULL + (uint64_t)ts.tv_nsec;
+}
 
 static inline mp_uint_t mp_hal_ticks_ms(void) {
     struct timespec ts;

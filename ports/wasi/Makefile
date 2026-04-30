@@ -60,7 +60,8 @@ SRC_C = \
 	main.c \
 	mphalport.c \
 	modsocket.c \
-	shared/runtime/stdout_helpers.c
+	shared/runtime/stdout_helpers.c \
+	shared/timeutils/timeutils.c
 
 SRC_QSTR += $(SRC_C) $(SHARED_SRC_C)
 

@@ -169,6 +169,17 @@
 // Enable errno module
 #define MICROPY_PY_ERRNO            (1)
 
+// Enable time functions (WASI libc supports these)
+#define MICROPY_PY_TIME_GMTIME_LOCALTIME_MKTIME (1)
+#define MICROPY_PY_TIME_TIME_TIME_NS (1)
+
+// Enable sys features
+#define MICROPY_PY_SYS_EXC_INFO     (1)
+#define MICROPY_PY_SYS_ATEXIT       (1)
+
+// Note: MICROPY_PY_BUILTINS_HELP and INPUT are disabled because they
+// require readline which is not available in WASI Preview2
+
 // Enable asyncio (required for async/await with sockets)
 #define MICROPY_PY_ASYNCIO          (1)
 
