@@ -23,6 +23,29 @@ LD = $(WASI_SDK_PATH)/bin/wasm32-wasip2-clang
 AR = $(WASI_SDK_PATH)/bin/llvm-ar
 SIZE = true
 
+# mbedTLS path (sibling project in monorepo)
+MBEDTLS_DIR = $(PWD)/../../mbedtls
+MBEDTLS_BUILD = $(MBEDTLS_DIR)/build-wasi
+MBEDTLS_CONFIG_FILE = \"mbedtls/mbedtls_config.h\"
+
+# Enable SSL/TLS
+MICROPY_PY_SSL = 1
+MICROPY_SSL_MBEDTLS = 1
+
+# mbedTLS config: disable platform entropy (WASI has no /dev/urandom)
+# Use custom wasi_entropy.c instead
+CFLAGS += -DMBEDTLS_NO_PLATFORM_ENTROPY
+# WASI supports clock_gettime, treat as unix-like for mbedtls_ms_time
+CFLAGS += -DMBEDTLS_PLATFORM_IS_UNIXLIKE
+# mbedTLS timing.c needs signal.h, WASI provides emulated version
+CFLAGS += -D_WASI_EMULATED_SIGNAL
+
+# Override mbedTLS dir to use sibling project in monorepo
+# (must use override because extmod.mk sets MBEDTLS_DIR = lib/mbedtls)
+# Path from ports/wasi/ to sandbox/mbedtls/ is ../../../../mbedtls/
+override MBEDTLS_DIR = $(PWD)/../../../../mbedtls
+override MBEDTLS_CONFIG_FILE = \"mbedtls/mbedtls_config.h\"
+
 # qstr definitions (must come before including py.mk)
 QSTR_DEFS = qstrdefsport.h
 
@@ -48,6 +71,8 @@ CFLAGS += -fdata-sections -ffunction-sections
 # 关键：启用异常处理并禁用旧版 EH，使用 wasip2 target
 CFLAGS += -target wasm32-wasip2
 CFLAGS += -mllvm -wasm-enable-sjlj -mllvm -wasm-use-legacy-eh=0
+# mbedTLS headers
+CFLAGS += -I$(MBEDTLS_DIR)/include
 
 LDFLAGS += -Wl,--gc-sections
 LDFLAGS += -mexec-model=command
@@ -61,7 +86,8 @@ SRC_C = \
 	mphalport.c \
 	modsocket.c \
 	shared/runtime/stdout_helpers.c \
-	shared/timeutils/timeutils.c
+	shared/timeutils/timeutils.c \
+	$(PWD)/../../../../mbedtls/wasi_entropy.c
 
 SRC_QSTR += $(SRC_C) $(SHARED_SRC_C)
 

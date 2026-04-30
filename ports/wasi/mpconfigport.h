@@ -186,6 +186,9 @@
 // Time ticks period for asyncio
 #define MICROPY_PY_TIME_TICKS_PERIOD (65536)
 
+// Note: MICROPY_PY_SSL and MICROPY_SSL_MBEDTLS are defined in Makefile
+// (via CFLAGS_EXTMOD from extmod.mk) to avoid macro redefinition warnings
+
 // Use standard C printf/stdout
 #define MICROPY_USE_INTERNAL_PRINTF (0)
 
