@@ -212,7 +212,7 @@ static MP_DEFINE_CONST_FUN_OBJ_1(socket_fileno_obj, socket_fileno);
  * 
  * WASI Preview2 本版实现：
  *   1. 解析 Python 元组 (host, port) - 因为 WASI 不支持 sockaddr 缓冲区直接传递
- *   2. 使用 inet_pton() 将 IP 字符串转为二进制 - 因为 WASI Preview2 不支持 getaddrinfo()
+ *   2. 使用 inet_pton() 或 getaddrinfo() 解析地址 - inet_pton 用于 IP，getaddrinfo 用于域名
  *   3. EINPROGRESS 使用 poll() 等待连接完成 - 因为 WASI socket 默认非阻塞
  * 
  * 这些修改是因为 WASI Preview2 的 socket 行为与标准 POSIX 有差异：
@@ -223,67 +223,126 @@ static MP_DEFINE_CONST_FUN_OBJ_1(socket_fileno_obj, socket_fileno);
 static mp_obj_t socket_connect(mp_obj_t self_in, mp_obj_t addr_in) {
     mp_obj_socket_t *self = MP_OBJ_TO_PTR(self_in);
     
-    /* === 差异 1: 解析 Python 元组而非使用缓冲区 === */
+    /* === 差异 1: 支持两种地址格式 === */
     // Unix port: mp_get_buffer_raise(addr_in, &bufinfo, MP_BUFFER_READ);
-    // WASI 版本: 手动解析 (host, port) 元组
-    mp_obj_t *addr_items;
-    mp_obj_get_array_fixed_n(addr_in, 2, &addr_items);
-    
-    const char *host = mp_obj_str_get_str(addr_items[0]);
-    mp_int_t port = mp_obj_get_int(addr_items[1]);
-    
-    /* === 差异 2: 使用 inet_pton 而非 getaddrinfo === */
-    // Unix port: 地址已经通过 getaddrinfo 解析为 sockaddr
-    // WASI 版本: 必须使用 IP 地址字符串 + inet_pton (DNS 不支持)
-    struct sockaddr_in addr;
-    addr.sin_family = AF_INET;
-    addr.sin_port = htons(port);
-    
-    if (inet_pton(AF_INET, host, &addr.sin_addr) != 1) {
-        mp_raise_ValueError(MP_ERROR_TEXT("invalid IP address (DNS not supported)"));
-    }
-    
-    /* === 差异 3: EINPROGRESS 使用 poll 等待 === */
-    // Unix port: EINPROGRESS -> MP_ETIMEDOUT (直接报错)
-    // WASI 版本: EINPROGRESS -> poll() 等待连接完成
-    for (;;) {
-        int r = connect(self->fd, (const struct sockaddr *)&addr, sizeof(addr));
-        if (r == -1) {
-            int err = errno;
-            if (self->blocking) {
-                if (err == EINTR) {
-                    mp_handle_pending(true);
-                    continue;
-                }
-                // WASI Preview2 特殊处理：
-                // 阻塞 socket 也可能返回 EINPROGRESS，必须使用 poll 等待
-                if (err == EINPROGRESS) {
-                    struct pollfd pfd = { .fd = self->fd, .events = POLLOUT };
-                    int poll_ret;
-                    // 使用 30 秒超时轮询
-                    MP_HAL_RETRY_SYSCALL(poll_ret, poll(&pfd, 1, 30000), {
-                        mp_raise_OSError(err);
-                    });
-                    if (poll_ret == 0) {
-                        // 超时
-                        mp_raise_OSError(MP_ETIMEDOUT);
-                    }
-                    // 检查连接是否成功
-                    int so_error = 0;
-                    socklen_t so_error_len = sizeof(so_error);
-                    r = getsockopt(self->fd, SOL_SOCKET, SO_ERROR, &so_error, &so_error_len);
-                    if (r == -1) {
-                        mp_raise_OSError(errno);
-                    }
-                    if (so_error != 0) {
-                        mp_raise_OSError(so_error);
-                    }
-                    return mp_const_none;
-                }
+    // WASI 版本: 同时支持 (host, port) 元组 和 bytearray (sockaddr 缓冲区，asyncio 使用)
+    if (mp_obj_is_type(addr_in, &mp_type_tuple) || mp_obj_is_type(addr_in, &mp_type_list)) {
+        // (host, port) 元组格式
+        mp_obj_t *addr_items;
+        mp_obj_get_array_fixed_n(addr_in, 2, &addr_items);
+        
+        const char *host = mp_obj_str_get_str(addr_items[0]);
+        mp_int_t port = mp_obj_get_int(addr_items[1]);
+        
+        /* === 差异 2: 使用 inet_pton + getaddrinfo 解析地址 === */
+        // Unix port: 地址已经通过 getaddrinfo 解析为 sockaddr
+        // WASI 版本: 先尝试 inet_pton 解析 IP，失败则用 getaddrinfo 解析域名 (需 -S allow-ip-name-lookup=y)
+        struct sockaddr_in addr;
+        addr.sin_family = AF_INET;
+        addr.sin_port = htons(port);
+        
+        if (inet_pton(AF_INET, host, &addr.sin_addr) != 1) {
+            // inet_pton 失败，尝试用 getaddrinfo 解析域名
+            struct addrinfo hints;
+            memset(&hints, 0, sizeof(hints));
+            hints.ai_family = AF_INET;
+            hints.ai_socktype = SOCK_STREAM;
+            
+            char port_str[6];
+            snprintf(port_str, sizeof(port_str), "%d", (int)port);
+            
+            struct addrinfo *addr_list;
+            int res = getaddrinfo(host, port_str, &hints, &addr_list);
+            if (res != 0 || addr_list == NULL) {
+                mp_raise_msg_varg(&mp_type_OSError, MP_ERROR_TEXT("[addrinfo error %d]"), res);
             }
-            mp_raise_OSError(err);
+            
+            // 使用第一个结果
+            memcpy(&addr, addr_list->ai_addr, sizeof(addr));
+            freeaddrinfo(addr_list);
         }
-        return mp_const_none;
+        
+        /* === 差异 3: EINPROGRESS 使用 poll 等待 === */
+        // Unix port: EINPROGRESS -> MP_ETIMEDOUT (直接报错)
+        // WASI 版本: EINPROGRESS -> poll() 等待连接完成
+        for (;;) {
+            int r = connect(self->fd, (const struct sockaddr *)&addr, sizeof(addr));
+            if (r == -1) {
+                int err = errno;
+                if (self->blocking) {
+                    if (err == EINTR) {
+                        mp_handle_pending(true);
+                        continue;
+                    }
+                    // WASI Preview2 特殊处理：
+                    // 阻塞 socket 也可能返回 EINPROGRESS，必须使用 poll 等待
+                    if (err == EINPROGRESS) {
+                        struct pollfd pfd = { .fd = self->fd, .events = POLLOUT };
+                        int poll_ret;
+                        // 使用 30 秒超时轮询
+                        MP_HAL_RETRY_SYSCALL(poll_ret, poll(&pfd, 1, 30000), {
+                            mp_raise_OSError(err);
+                        });
+                        if (poll_ret == 0) {
+                            // 超时
+                            mp_raise_OSError(MP_ETIMEDOUT);
+                        }
+                        // 检查连接是否成功
+                        int so_error = 0;
+                        socklen_t so_error_len = sizeof(so_error);
+                        r = getsockopt(self->fd, SOL_SOCKET, SO_ERROR, &so_error, &so_error_len);
+                        if (r == -1) {
+                            mp_raise_OSError(errno);
+                        }
+                        if (so_error != 0) {
+                            mp_raise_OSError(so_error);
+                        }
+                        return mp_const_none;
+                    }
+                }
+                mp_raise_OSError(err);
+            }
+            return mp_const_none;
+        }
+    } else {
+        // bytearray 格式 (asyncio 使用 getaddrinfo 返回的 sockaddr 缓冲区)
+        mp_buffer_info_t bufinfo;
+        mp_get_buffer_raise(addr_in, &bufinfo, MP_BUFFER_READ);
+        
+        for (;;) {
+            int r = connect(self->fd, (const struct sockaddr *)bufinfo.buf, bufinfo.len);
+            if (r == -1) {
+                int err = errno;
+                if (self->blocking) {
+                    if (err == EINTR) {
+                        mp_handle_pending(true);
+                        continue;
+                    }
+                    if (err == EINPROGRESS) {
+                        struct pollfd pfd = { .fd = self->fd, .events = POLLOUT };
+                        int poll_ret;
+                        MP_HAL_RETRY_SYSCALL(poll_ret, poll(&pfd, 1, 30000), {
+                            mp_raise_OSError(err);
+                        });
+                        if (poll_ret == 0) {
+                            mp_raise_OSError(MP_ETIMEDOUT);
+                        }
+                        int so_error = 0;
+                        socklen_t so_error_len = sizeof(so_error);
+                        r = getsockopt(self->fd, SOL_SOCKET, SO_ERROR, &so_error, &so_error_len);
+                        if (r == -1) {
+                            mp_raise_OSError(errno);
+                        }
+                        if (so_error != 0) {
+                            mp_raise_OSError(so_error);
+                        }
+                        return mp_const_none;
+                    }
+                }
+                mp_raise_OSError(err);
+            }
+            return mp_const_none;
+        }
     }
 }
 static MP_DEFINE_CONST_FUN_OBJ_2(socket_connect_obj, socket_connect);
@@ -301,23 +360,31 @@ static MP_DEFINE_CONST_FUN_OBJ_2(socket_connect_obj, socket_connect);
 static mp_obj_t socket_bind(mp_obj_t self_in, mp_obj_t addr_in) {
     mp_obj_socket_t *self = MP_OBJ_TO_PTR(self_in);
     
-    // 解析地址元组 (host, port)
-    mp_obj_t *addr_items;
-    mp_obj_get_array_fixed_n(addr_in, 2, &addr_items);
-    
-    const char *host = mp_obj_str_get_str(addr_items[0]);
-    mp_int_t port = mp_obj_get_int(addr_items[1]);
-    
-    struct sockaddr_in addr;
-    addr.sin_family = AF_INET;
-    addr.sin_port = htons(port);
-    
-    if (inet_pton(AF_INET, host, &addr.sin_addr) != 1) {
-        mp_raise_ValueError(MP_ERROR_TEXT("invalid IP address"));
+    if (mp_obj_is_type(addr_in, &mp_type_tuple) || mp_obj_is_type(addr_in, &mp_type_list)) {
+        // (host, port) 元组格式
+        mp_obj_t *addr_items;
+        mp_obj_get_array_fixed_n(addr_in, 2, &addr_items);
+        
+        const char *host = mp_obj_str_get_str(addr_items[0]);
+        mp_int_t port = mp_obj_get_int(addr_items[1]);
+        
+        struct sockaddr_in addr;
+        addr.sin_family = AF_INET;
+        addr.sin_port = htons(port);
+        
+        if (inet_pton(AF_INET, host, &addr.sin_addr) != 1) {
+            mp_raise_ValueError(MP_ERROR_TEXT("invalid IP address"));
+        }
+        
+        int r = bind(self->fd, (const struct sockaddr *)&addr, sizeof(addr));
+        RAISE_ERRNO(r, errno);
+    } else {
+        // bytearray 格式 (asyncio 使用 getaddrinfo 返回的 sockaddr 缓冲区)
+        mp_buffer_info_t bufinfo;
+        mp_get_buffer_raise(addr_in, &bufinfo, MP_BUFFER_READ);
+        int r = bind(self->fd, (const struct sockaddr *)bufinfo.buf, bufinfo.len);
+        RAISE_ERRNO(r, errno);
     }
-    
-    int r = bind(self->fd, (const struct sockaddr *)&addr, sizeof(addr));
-    RAISE_ERRNO(r, errno);
     return mp_const_none;
 }
 static MP_DEFINE_CONST_FUN_OBJ_2(socket_bind_obj, socket_bind);
@@ -471,23 +538,49 @@ static mp_obj_t socket_sendto(mp_obj_t self_in, mp_obj_t data_in, mp_obj_t addr_
     mp_buffer_info_t bufinfo;
     mp_get_buffer_raise(data_in, &bufinfo, MP_BUFFER_READ);
 
-    // 解析 (host, port) 元组
-    mp_obj_t *addr_items;
-    mp_obj_get_array_fixed_n(addr_in, 2, &addr_items);
-
-    const char *host = mp_obj_str_get_str(addr_items[0]);
-    mp_int_t port = mp_obj_get_int(addr_items[1]);
-
     struct sockaddr_in addr;
-    addr.sin_family = AF_INET;
-    addr.sin_port = htons(port);
+    socklen_t addr_len = sizeof(addr);
 
-    if (inet_pton(AF_INET, host, &addr.sin_addr) != 1) {
-        mp_raise_ValueError(MP_ERROR_TEXT("invalid IP address"));
+    if (mp_obj_is_type(addr_in, &mp_type_tuple) || mp_obj_is_type(addr_in, &mp_type_list)) {
+        // (host, port) 元组格式
+        mp_obj_t *addr_items;
+        mp_obj_get_array_fixed_n(addr_in, 2, &addr_items);
+
+        const char *host = mp_obj_str_get_str(addr_items[0]);
+        mp_int_t port = mp_obj_get_int(addr_items[1]);
+
+        addr.sin_family = AF_INET;
+        addr.sin_port = htons(port);
+
+        if (inet_pton(AF_INET, host, &addr.sin_addr) != 1) {
+            // inet_pton 失败，尝试用 getaddrinfo 解析域名
+            struct addrinfo hints;
+            memset(&hints, 0, sizeof(hints));
+            hints.ai_family = AF_INET;
+            hints.ai_socktype = SOCK_DGRAM;
+
+            char port_str[6];
+            snprintf(port_str, sizeof(port_str), "%d", (int)port);
+
+            struct addrinfo *addr_list;
+            int res = getaddrinfo(host, port_str, &hints, &addr_list);
+            if (res != 0 || addr_list == NULL) {
+                mp_raise_msg_varg(&mp_type_OSError, MP_ERROR_TEXT("[addrinfo error %d]"), res);
+            }
+
+            // 使用第一个结果
+            memcpy(&addr, addr_list->ai_addr, sizeof(addr));
+            freeaddrinfo(addr_list);
+        }
+    } else {
+        // bytearray 格式
+        mp_buffer_info_t addr_bufinfo;
+        mp_get_buffer_raise(addr_in, &addr_bufinfo, MP_BUFFER_READ);
+        memcpy(&addr, addr_bufinfo.buf, addr_bufinfo.len);
     }
 
     ssize_t out_sz;
-    MP_HAL_RETRY_SYSCALL(out_sz, sendto(self->fd, bufinfo.buf, bufinfo.len, 0, (struct sockaddr *)&addr, sizeof(addr)), mp_raise_OSError(err));
+    MP_HAL_RETRY_SYSCALL(out_sz, sendto(self->fd, bufinfo.buf, bufinfo.len, 0, (struct sockaddr *)&addr, addr_len), mp_raise_OSError(err));
     return mp_obj_new_int(out_sz);
 }
 static MP_DEFINE_CONST_FUN_OBJ_3(socket_sendto_obj, socket_sendto);
