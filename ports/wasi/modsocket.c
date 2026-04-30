@@ -23,7 +23,6 @@
  * 
  * 4. 缺失的功能
  *    - getaddrinfo(): WASI Preview2 不支持 DNS 解析
- *    - UDP socket: 未实现 sendto/recvfrom（TCP focus）
  *    - Unix domain socket: AF_UNIX 可能不受支持
  * 
  * 5. 行为一致的函数
@@ -392,6 +391,14 @@ static mp_obj_t socket_recv(size_t n_args, const mp_obj_t *args) {
 }
 static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(socket_recv_obj, 2, 3, socket_recv);
 
+/**
+ * socket.recvfrom() 方法 - WASI Preview2 版本
+ *
+ * 【与 Unix port 的差异】
+ * Unix port: 返回 (data, sockaddr_bytearray)
+ * WASI 版本: 返回 (data, (host, port)) 元组
+ * 原因: WASI Preview2 的 sockaddr 缓冲区在 Python 层不友好
+ */
 static mp_obj_t socket_recvfrom(size_t n_args, const mp_obj_t *args) {
     mp_obj_socket_t *self = MP_OBJ_TO_PTR(args[0]);
     int sz = mp_obj_get_int(args[1]);
@@ -408,9 +415,33 @@ static mp_obj_t socket_recvfrom(size_t n_args, const mp_obj_t *args) {
     ssize_t out_sz;
     MP_HAL_RETRY_SYSCALL(out_sz, recvfrom(self->fd, buf, sz, flags, (struct sockaddr *)&addr, &addr_len), mp_raise_OSError(err));
 
+    // 解析 sockaddr 为 (host, port) 元组
+    mp_obj_t addr_tuple;
+    if (addr.ss_family == AF_INET) {
+        struct sockaddr_in *sin = (struct sockaddr_in *)&addr;
+        char host[INET_ADDRSTRLEN];
+        inet_ntop(AF_INET, &sin->sin_addr, host, sizeof(host));
+        mp_obj_t items[2] = {
+            mp_obj_new_str(host, strlen(host)),
+            mp_obj_new_int(ntohs(sin->sin_port))
+        };
+        addr_tuple = mp_obj_new_tuple(2, items);
+    } else if (addr.ss_family == AF_INET6) {
+        struct sockaddr_in6 *sin6 = (struct sockaddr_in6 *)&addr;
+        char host[INET6_ADDRSTRLEN];
+        inet_ntop(AF_INET6, &sin6->sin6_addr, host, sizeof(host));
+        mp_obj_t items[2] = {
+            mp_obj_new_str(host, strlen(host)),
+            mp_obj_new_int(ntohs(sin6->sin6_port))
+        };
+        addr_tuple = mp_obj_new_tuple(2, items);
+    } else {
+        addr_tuple = mp_const_none;
+    }
+
     mp_obj_tuple_t *t = MP_OBJ_TO_PTR(mp_obj_new_tuple(2, NULL));
     t->items[0] = mp_obj_new_str_of_type(&mp_type_bytes, buf, out_sz);
-    t->items[1] = mp_obj_new_bytearray(addr_len, &addr);
+    t->items[1] = addr_tuple;
     m_del(char, buf, sz);
     return MP_OBJ_FROM_PTR(t);
 }
@@ -427,15 +458,36 @@ static mp_obj_t socket_send(mp_obj_t self_in, mp_obj_t data_in) {
 }
 static MP_DEFINE_CONST_FUN_OBJ_2(socket_send_obj, socket_send);
 
+/**
+ * socket.sendto() 方法 - WASI Preview2 版本
+ *
+ * 【与 Unix port 的差异】
+ * Unix port: 使用 mp_get_buffer_raise() 获取 sockaddr 缓冲区
+ * WASI 版本: 手动解析 (host, port) 元组，使用 inet_pton() 转换
+ * 原因: WASI Preview2 的 sockaddr 缓冲区传递不可靠
+ */
 static mp_obj_t socket_sendto(mp_obj_t self_in, mp_obj_t data_in, mp_obj_t addr_in) {
     mp_obj_socket_t *self = MP_OBJ_TO_PTR(self_in);
     mp_buffer_info_t bufinfo;
     mp_get_buffer_raise(data_in, &bufinfo, MP_BUFFER_READ);
-    mp_buffer_info_t bufinfo2;
-    mp_get_buffer_raise(addr_in, &bufinfo2, MP_BUFFER_READ);
+
+    // 解析 (host, port) 元组
+    mp_obj_t *addr_items;
+    mp_obj_get_array_fixed_n(addr_in, 2, &addr_items);
+
+    const char *host = mp_obj_str_get_str(addr_items[0]);
+    mp_int_t port = mp_obj_get_int(addr_items[1]);
+
+    struct sockaddr_in addr;
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(port);
+
+    if (inet_pton(AF_INET, host, &addr.sin_addr) != 1) {
+        mp_raise_ValueError(MP_ERROR_TEXT("invalid IP address"));
+    }
 
     ssize_t out_sz;
-    MP_HAL_RETRY_SYSCALL(out_sz, sendto(self->fd, bufinfo.buf, bufinfo.len, 0, (struct sockaddr *)bufinfo2.buf, bufinfo2.len), mp_raise_OSError(err));
+    MP_HAL_RETRY_SYSCALL(out_sz, sendto(self->fd, bufinfo.buf, bufinfo.len, 0, (struct sockaddr *)&addr, sizeof(addr)), mp_raise_OSError(err));
     return mp_obj_new_int(out_sz);
 }
 static MP_DEFINE_CONST_FUN_OBJ_3(socket_sendto_obj, socket_sendto);
