@@ -200,11 +200,20 @@ wasm-tools component wit build-component/micropython-guest.wasm
 # 使用 wac 组合（busybox 作为 host，micropython 作为 guest）
 wac plug ./busybox-component.wasm \
   --plug ../micropython-1.27.0-wasi/ports/wasi/build-component/micropython-guest.wasm \
-  -o composed-micropython.wasm
+  -o composed-busybox.wasm
 
 # 在 busybox wsh 中调用 python
 wasmtime run -W exceptions=y -S tcp=y -S inherit-network=y \
-  --dir=/tmp composed-micropython.wasm wsh -c 'python print("hello")'
+  --dir=/tmp composed-busybox.wasm wsh -c 'python print("hello")'
+```
+
+也可以同时组合 git 和 python：
+
+```bash
+wac plug ./busybox-component.wasm \
+  --plug ../libgit2/build-component/git-guest.wasm \
+  --plug ../micropython-1.27.0-wasi/ports/wasi/build-component/micropython-guest.wasm \
+  -o composed-busybox.wasm
 ```
 
 Component 模式下 `execute(args: list<string>) -> s32` 的行为与 CLI 模式一致：
