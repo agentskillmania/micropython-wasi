@@ -50,7 +50,7 @@ mkdir -p "$BUILD_DIR/bindings" "$BUILD_DIR/obj"
 # --- Step 1: Generate guest bindings from WIT ---
 
 echo "--- Generating guest bindings ---"
-$WIT_BINDGEN c "$WIT_DIR" --world guest-subcommand --out-dir "$BUILD_DIR/bindings"
+$WIT_BINDGEN c "$WIT_DIR" --world guest-python --out-dir "$BUILD_DIR/bindings"
 
 # --- Step 2: Compiler flags ---
 
@@ -68,8 +68,8 @@ $CC $CFLAGS \
 
 echo "--- Compiling WIT bindings ---"
 $CC $CFLAGS \
-    -c "$BUILD_DIR/bindings/guest_subcommand.c" \
-    -o "$BUILD_DIR/obj/guest_subcommand.o"
+    -c "$BUILD_DIR/bindings/guest_python.c" \
+    -o "$BUILD_DIR/obj/guest_python.o"
 
 # --- Step 5: Collect all MicroPython object files ---
 
@@ -86,8 +86,8 @@ $CC -O2 \
     -o "$BUILD_DIR/micropython-guest.wasm" \
     $OBJECTS \
     "$BUILD_DIR/obj/guest_main.o" \
-    "$BUILD_DIR/obj/guest_subcommand.o" \
-    "$BUILD_DIR/bindings/guest_subcommand_component_type.o" \
+    "$BUILD_DIR/obj/guest_python.o" \
+    "$BUILD_DIR/bindings/guest_python_component_type.o" \
     -Wl,--gc-sections \
     -Wl,--allow-undefined \
     -lsetjmp \

@@ -180,9 +180,9 @@ MicroPython 使用 VFS 的原因：
 - 文件大小：约 1.3MB（含 socket + TLS + frozen modules）
 - 堆内存：256KB
 
-### WASI Component Model（subcommand 接口）
+### WASI Component Model（python 接口）
 
-除了作为独立 CLI 运行，MicroPython 还可以导出 `agentskillmania:subcommand` 接口，被 host component（如 busybox-wasi）组合调用：
+除了作为独立 CLI 运行，MicroPython 还可以导出 `agentskillmania:subcommand/python` 接口，被 host component（如 busybox-wasi）组合调用：
 
 ```bash
 # 构建 component 版本（输出 build-component/micropython-guest.wasm）
@@ -190,7 +190,7 @@ MicroPython 使用 VFS 的原因：
 
 # 导出接口
 wasm-tools component wit build-component/micropython-guest.wasm
-# → export agentskillmania:subcommand/subcommand;
+# → export agentskillmania:subcommand/python;
 # → export wasi:cli/run@0.2.0;
 ```
 

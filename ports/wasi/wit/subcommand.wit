@@ -1,19 +1,31 @@
 package agentskillmania:subcommand;
 
-/// Generic sub-command interface.
-/// Any WASM CLI tool can export this to be composed into a host runner.
-interface subcommand {
-    /// Execute the sub-command with the given arguments.
+/// Sub-command interface for git (libgit2 CLI).
+interface git {
+    /// Execute the git sub-command with the given arguments.
     /// Returns the process exit code (0 = success, non-zero = failure).
     execute: func(args: list<string>) -> s32;
 }
 
-/// World for a guest component that provides a sub-command.
-world guest-subcommand {
-    export subcommand;
+/// Sub-command interface for python (MicroPython).
+interface python {
+    /// Execute the python sub-command with the given arguments.
+    /// Returns the process exit code (0 = success, non-zero = failure).
+    execute: func(args: list<string>) -> s32;
 }
 
 /// World for a host component that consumes sub-commands.
 world host-runner {
-    import subcommand;
+    import git;
+    import python;
+}
+
+/// World for a guest component that provides the git sub-command.
+world guest-git {
+    export git;
+}
+
+/// World for a guest component that provides the python sub-command.
+world guest-python {
+    export python;
 }

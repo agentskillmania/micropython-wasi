@@ -1,11 +1,11 @@
 /**
  * Component guest wrapper for MicroPython WASI.
  *
- * Converts WIT subcommand args to argc/argv and calls mpy_cli_main.
+ * Converts WIT python interface args to argc/argv and calls mpy_cli_main.
  * This allows MicroPython to be composed into a host runner (e.g. busybox-wasi)
- * via the agentskillmania:subcommand interface.
+ * via the agentskillmania:subcommand/python interface.
  */
-#include "guest_subcommand.h"
+#include "guest_python.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -13,8 +13,8 @@
 /* Forward declaration — MicroPython CLI entry (defined in main.c) */
 extern int mpy_cli_main(int argc, char **argv);
 
-int32_t exports_agentskillmania_subcommand_subcommand_execute(
-    guest_subcommand_list_string_t *args)
+int32_t exports_agentskillmania_subcommand_python_execute(
+    guest_python_list_string_t *args)
 {
     int argc = (int)args->len;
     if (argc == 0) return 1;
@@ -23,7 +23,7 @@ int32_t exports_agentskillmania_subcommand_subcommand_execute(
     if (!argv) return 1;
 
     for (size_t i = 0; i < (size_t)argc; i++) {
-        /* guest_subcommand strings are NOT null-terminated */
+        /* guest_python strings are NOT null-terminated */
         size_t len = args->ptr[i].len;
         argv[i] = malloc(len + 1);
         if (!argv[i]) {
