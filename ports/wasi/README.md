@@ -207,15 +207,6 @@ wasmtime run -W exceptions=y -S tcp=y -S inherit-network=y \
   --dir=/tmp composed-busybox.wasm wsh -c 'python print("hello")'
 ```
 
-也可以同时组合 git 和 python：
-
-```bash
-wac plug ./busybox-component.wasm \
-  --plug ../libgit2/build-component/git-guest.wasm \
-  --plug ../micropython-1.27.0-wasi/ports/wasi/build-component/micropython-guest.wasm \
-  -o composed-busybox.wasm
-```
-
 Component 模式下 `execute(args: list<string>) -> s32` 的行为与 CLI 模式一致：
 - `args[0]` 作为 `sys.argv[0]`（通常是子命令名，如 `python`）
 - `args[1:]` 作为 Python 代码依次执行
