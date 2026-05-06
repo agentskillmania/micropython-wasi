@@ -128,42 +128,50 @@ int mpy_cli_main(int argc, char **argv) {
     #endif
 
     int ret = 0;
-    
-    // 处理命令行参数
+
+    // Handle command-line arguments (CPython-compatible)
     if (argc > 1) {
-        // 如果有参数，将每个参数作为 Python 代码执行
-        for (int i = 1; i < argc; i++) {
-            ret = exec_python_code(argv[i]);
-            if (ret != 0) break;
+        if (strcmp(argv[1], "-c") == 0) {
+            // python -c "code" — execute code string
+            if (argc > 2) {
+                ret = exec_python_code(argv[2]);
+            } else {
+                fprintf(stderr, "python: -c requires an argument\n");
+                ret = 1;
+            }
+        } else if (strcmp(argv[1], "--version") == 0 || strcmp(argv[1], "-V") == 0) {
+            printf("MicroPython %s\n", MICROPY_VERSION_STRING);
+        } else if (strcmp(argv[1], "--help") == 0 || strcmp(argv[1], "-h") == 0) {
+            printf("Usage: python [option] ... [-c cmd | file] [arg] ...\n");
+            printf("Options:\n");
+            printf("  -c cmd     Program passed in as string\n");
+            printf("  -h, --help Show this help message and exit\n");
+            printf("  -V, --version Print the MicroPython version number and exit\n");
+        } else if (argv[1][0] == '-') {
+            // Unknown option
+            fprintf(stderr, "python: unknown option '%s'\n", argv[1]);
+            fprintf(stderr, "Use python --help for usage information.\n");
+            ret = 1;
+        } else {
+            // python script.py — execute file
+            nlr_buf_t nlr;
+            if (nlr_push(&nlr) == 0) {
+                mp_lexer_t *lex = mp_lexer_new_from_file(qstr_from_str(argv[1]));
+                mp_parse_tree_t parse_tree = mp_parse(lex, MP_PARSE_FILE_INPUT);
+                mp_obj_t module_fun = mp_compile(&parse_tree, lex->source_name, false);
+                nlr_pop();
+                mp_call_function_0(module_fun);
+            } else {
+                mp_obj_print_exception(&mp_plat_print, (mp_obj_t)nlr.ret_val);
+                ret = 1;
+            }
         }
     } else {
-        // 没有参数时，执行内置测试代码
-        const char *test_code = 
-            "import sys\n"
-            "print('=== MicroPython on WASI Preview2 ===')\n"
-            "print('Platform:', sys.platform)\n"
-            "print('Version:', sys.version)\n"
-            "print()\n"
-            "print('=== Testing socket module ===')\n"
-            "try:\n"
-            "    import socket\n"
-            "    print('socket module imported successfully')\n"
-            "    print('Available attributes:', [x for x in dir(socket) if not x.startswith(\"_\")])\n"
-            "    print()\n"
-            "    print('=== Creating a socket ===')\n"
-            "    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)\n"
-            "    print('Socket created:', s)\n"
-            "    print('File descriptor:', s.fileno())\n"
-            "    s.close()\n"
-            "    print('Socket closed successfully')\n"
-            "except Exception as e:\n"
-            "    print('Error:', e)\n"
-            "print()\n"
-            "print('Done!')";
-        ret = exec_python_code(test_code);
+        // python — no arguments, print version info
+        printf("MicroPython %s\n", MICROPY_VERSION_STRING);
     }
 
-    // 清理 MicroPython
+    // Clean up MicroPython
     mp_deinit();
     return ret;
 }

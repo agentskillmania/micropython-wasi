@@ -623,49 +623,37 @@ static MP_DEFINE_CONST_FUN_OBJ_2(socket_setblocking_obj, socket_setblocking);
 static mp_obj_t socket_settimeout(mp_obj_t self_in, mp_obj_t timeout_in) {
     mp_obj_socket_t *self = MP_OBJ_TO_PTR(self_in);
 
-    bool new_blocking;
     struct timeval tv;
 
     if (timeout_in == mp_const_none) {
-        new_blocking = true;
+        // None = restore blocking mode with no timeout
         tv.tv_sec = 0;
         tv.tv_usec = 0;
+        int r = setsockopt(self->fd, SOL_SOCKET, SO_RCVTIMEO, NULL, 0);
+        RAISE_ERRNO(r, errno);
+        r = setsockopt(self->fd, SOL_SOCKET, SO_SNDTIMEO, NULL, 0);
+        RAISE_ERRNO(r, errno);
+        // Restore blocking mode if it was changed
+        if (!self->blocking) {
+            socket_setblocking(self_in, mp_obj_new_bool(true));
+        }
     } else {
-        new_blocking = false;
         mp_float_t val = mp_obj_get_float(timeout_in);
         if (val < 0) {
             mp_raise_ValueError(MP_ERROR_TEXT("negative timeout"));
-        }
-        // Some code still uses non-blocking I/O, so make sure we don't
-        // unconditionally set blocking mode here.
-        int fl = fcntl(self->fd, F_GETFL, 0);
-        RAISE_ERRNO(fl, errno);
-        if (fl & O_NONBLOCK) {
-            fl &= ~O_NONBLOCK;
-            int r = fcntl(self->fd, F_SETFL, fl);
-            RAISE_ERRNO(r, errno);
         }
         val = val * 1000; // float to ms (secs)
         int ms = (int)val;
         tv.tv_sec = ms / 1000;
         tv.tv_usec = (ms % 1000) * 1000;
-    }
-
-    // Apply timeout to send and recv separately
-    if (new_blocking) {
-        int r = setsockopt(self->fd, SOL_SOCKET, SO_RCVTIMEO, NULL, 0);
-        RAISE_ERRNO(r, errno);
-        r = setsockopt(self->fd, SOL_SOCKET, SO_SNDTIMEO, NULL, 0);
-        RAISE_ERRNO(r, errno);
-    } else {
+        // Set timeout via SO_RCVTIMEO/SO_SNDTIMEO only.
+        // Do NOT switch to non-blocking mode — WASI sockets handle
+        // connect EINPROGRESS via poll only when blocking=true, and
+        // recv/send rely on SO_RCVTIMEO for timeout in blocking mode.
         int r = setsockopt(self->fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(struct timeval));
         RAISE_ERRNO(r, errno);
         r = setsockopt(self->fd, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(struct timeval));
         RAISE_ERRNO(r, errno);
-    }
-
-    if (self->blocking != new_blocking) {
-        socket_setblocking(self_in, mp_obj_new_bool(new_blocking));
     }
 
     return mp_const_none;
