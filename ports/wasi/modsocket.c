@@ -106,7 +106,7 @@ static void socket_print(const mp_print_t *print, mp_obj_t self_in, mp_print_kin
 static mp_uint_t socket_read(mp_obj_t o_in, void *buf, mp_uint_t size, int *errcode) {
     mp_obj_socket_t *o = MP_OBJ_TO_PTR(o_in);
     ssize_t r;
-    MP_HAL_RETRY_SYSCALL(r, read(o->fd, buf, size), {
+    MP_HAL_RETRY_SYSCALL(r, recv(o->fd, buf, size, 0), {
         // On blocking socket, we get EAGAIN in case SO_RCVTIMEO/SO_SNDTIMEO
         // timed out, and need to convert that to ETIMEDOUT.
         if (err == EAGAIN && o->blocking) {
@@ -122,7 +122,7 @@ static mp_uint_t socket_read(mp_obj_t o_in, void *buf, mp_uint_t size, int *errc
 static mp_uint_t socket_write(mp_obj_t o_in, const void *buf, mp_uint_t size, int *errcode) {
     mp_obj_socket_t *o = MP_OBJ_TO_PTR(o_in);
     ssize_t r;
-    MP_HAL_RETRY_SYSCALL(r, write(o->fd, buf, size), {
+    MP_HAL_RETRY_SYSCALL(r, send(o->fd, buf, size, 0), {
         // On blocking socket, we get EAGAIN in case SO_RCVTIMEO/SO_SNDTIMEO
         // timed out, and need to convert that to ETIMEDOUT.
         if (err == EAGAIN && o->blocking) {

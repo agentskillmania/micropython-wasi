@@ -100,8 +100,14 @@ int main(int argc, char **argv) {
     
     // 初始化 MicroPython
     mp_init();
-    
-    /* 
+
+    // 设置 sys.argv (参考 unix port 的 set_sys_argv)
+    mp_obj_list_init(MP_OBJ_TO_PTR(mp_sys_argv), 0);
+    for (int i = 0; i < argc; i++) {
+        mp_obj_list_append(mp_sys_argv, MP_OBJ_NEW_QSTR(qstr_from_str(argv[i])));
+    }
+
+    /*
      * 挂载 POSIX 文件系统
      * 这使得 Python 代码可以访问宿主机的文件系统
      */
@@ -117,7 +123,7 @@ int main(int argc, char **argv) {
         MP_STATE_VM(vfs_cur) = MP_STATE_VM(vfs_mount_table);
     }
     #endif
-    
+
     int ret = 0;
     
     // 处理命令行参数

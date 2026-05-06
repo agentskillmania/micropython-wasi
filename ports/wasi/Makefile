@@ -42,8 +42,8 @@ CFLAGS += -D_WASI_EMULATED_SIGNAL
 
 # Override mbedTLS dir to use sibling project in monorepo
 # (must use override because extmod.mk sets MBEDTLS_DIR = lib/mbedtls)
-# Path from ports/wasi/ to sandbox/mbedtls/ is ../../../../mbedtls/
-override MBEDTLS_DIR = $(PWD)/../../../../mbedtls
+# Path from ports/wasi/ to sandbox/mbedtls/ is ../../../mbedtls/
+override MBEDTLS_DIR = $(PWD)/../../../mbedtls
 override MBEDTLS_CONFIG_FILE = \"mbedtls/mbedtls_config.h\"
 
 # qstr definitions (must come before including py.mk)
@@ -87,7 +87,7 @@ SRC_C = \
 	modsocket.c \
 	shared/runtime/stdout_helpers.c \
 	shared/timeutils/timeutils.c \
-	$(PWD)/../../../../mbedtls/wasi_entropy.c
+	$(PWD)/../../../mbedtls/wasi_entropy.c
 
 SRC_QSTR += $(SRC_C) $(SHARED_SRC_C)
 
