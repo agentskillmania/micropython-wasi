@@ -88,9 +88,12 @@ int exec_python_code(const char *code) {
 }
 
 /**
- * 主函数 - 程序入口
+ * MicroPython CLI 主逻辑
+ * 
+ * 初始化运行时并执行 Python 代码，返回进程退出码。
+ * 可被 component guest wrapper 直接调用。
  */
-int main(int argc, char **argv) {
+int mpy_cli_main(int argc, char **argv) {
     // 获取栈地址用于 GC
     int stack_dummy;
     stack_top = (char *)&stack_dummy;
@@ -163,6 +166,13 @@ int main(int argc, char **argv) {
     // 清理 MicroPython
     mp_deinit();
     return ret;
+}
+
+/**
+ * 主函数 - 程序入口
+ */
+int main(int argc, char **argv) {
+    return mpy_cli_main(argc, argv);
 }
 
 /**

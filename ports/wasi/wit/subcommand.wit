@@ -1,0 +1,19 @@
+package agentskillmania:subcommand;
+
+/// Generic sub-command interface.
+/// Any WASM CLI tool can export this to be composed into a host runner.
+interface subcommand {
+    /// Execute the sub-command with the given arguments.
+    /// Returns the process exit code (0 = success, non-zero = failure).
+    execute: func(args: list<string>) -> s32;
+}
+
+/// World for a guest component that provides a sub-command.
+world guest-subcommand {
+    export subcommand;
+}
+
+/// World for a host component that consumes sub-commands.
+world host-runner {
+    import subcommand;
+}

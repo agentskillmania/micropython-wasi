@@ -168,10 +168,41 @@ MicroPython 使用 VFS 的原因：
 在我们的 WASI 场景中，`MICROPY_VFS_POSIX` 就是 VFS 的 POSIX 后端，内部实际调用 libc。
 
 ### WASI Preview2 组件
-- 导出 `wasi:cli/run@0.2.0` 接口
-- 导入 WASI 接口：filesystem, stdin/stdout/stderr, clocks, environment
-- 文件大小：约 925KB（含 socket 支持）
+- 导出 `wasi:cli/run@0.2.0` 接口（CLI 模式）
+- 导入 WASI 接口：filesystem, stdin/stdout/stderr, clocks, environment, sockets
+- 文件大小：约 1.3MB（含 socket + TLS + frozen modules）
 - 堆内存：256KB
+
+### WASI Component Model（subcommand 接口）
+
+除了作为独立 CLI 运行，MicroPython 还可以导出 `agentskillmania:subcommand` 接口，被 host component（如 busybox-wasi）组合调用：
+
+```bash
+# 构建 component 版本（输出 build-component/micropython-guest.wasm）
+./build_component.sh
+
+# 导出接口
+wasm-tools component wit build-component/micropython-guest.wasm
+# → export agentskillmania:subcommand/subcommand;
+# → export wasi:cli/run@0.2.0;
+```
+
+**与 busybox-wasi 组合：**
+
+```bash
+# 使用 wac 组合（busybox 作为 host，micropython 作为 guest）
+wac plug ./busybox-component.wasm \
+  --plug ../micropython-1.27.0-wasi/ports/wasi/build-component/micropython-guest.wasm \
+  -o composed-micropython.wasm
+
+# 在 busybox wsh 中调用 python
+wasmtime run -W exceptions=y -S tcp=y -S inherit-network=y \
+  --dir=/tmp composed-micropython.wasm wsh -c 'python print("hello")'
+```
+
+Component 模式下 `execute(args: list<string>) -> s32` 的行为与 CLI 模式一致：
+- `args[0]` 作为 `sys.argv[0]`（通常是子命令名，如 `python`）
+- `args[1:]` 作为 Python 代码依次执行
 
 ### 关键技术参数
 ```bash
