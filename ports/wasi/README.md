@@ -30,12 +30,18 @@
 
 ### ✅ 标准库模块
 ```python
-import sys      # platform, version, path, modules, argv, exit
-import math     # sqrt, sin, cos, tan, log, exp, pi, e
-import gc       # mem_free, mem_alloc, collect
-import os       # 文件系统操作
-import io       # 文件 I/O
-import socket   # TCP/UDP sockets, getaddrinfo
+import sys       # platform, version, path, modules, argv, exit
+import math      # sqrt, sin, cos, tan, log, exp, pi, e
+import gc        # mem_free, mem_alloc, collect
+import os        # 文件系统操作
+import io        # 文件 I/O
+import socket    # TCP/UDP sockets, getaddrinfo
+import ssl       # TLS/SSL wrap_socket
+import requests  # HTTP GET/POST (built on socket+ssl)
+import shutil    # copy, rmtree
+import tempfile  # mkdtemp, NamedTemporaryFile
+import pathlib   # Path
+import gzip      # compress/decompress
 ```
 
 ### ✅ 文件系统（WASI）
@@ -72,6 +78,7 @@ os.remove('/data/file.txt')
 
 - [WASI SDK 22+](https://github.com/WebAssembly/wasi-sdk) (LLVM 22+)
 - [wasmtime](https://wasmtime.dev/)
+- [wit-bindgen 0.57+](https://github.com/bytecodealliance/wit-bindgen) (仅 component 构建需要)
 
 ## 构建
 
@@ -80,7 +87,7 @@ cd ports/wasi
 make
 ```
 
-输出：`build/micropython.wasm`（约 925KB，包含 socket 支持，完全自包含）
+输出：`build/micropython.wasm`（约 1.3MB，包含 socket + TLS + frozen modules）
 
 ## 运行示例
 
@@ -259,14 +266,24 @@ s.close()
 
 ## 部署
 
-只需要拷贝 **`micropython.wasm`** 这一个文件（约 925KB）：
+### CLI 模式
+
+拷贝 `build/micropython.wasm`（约 1.3MB）到任意位置即可运行：
 
 ```bash
-# 复制到任意位置
 cp build/micropython.wasm /usr/local/bin/
-
-# 运行
 wasmtime run -W exceptions=y /usr/local/bin/micropython.wasm "print('Hello')"
+```
+
+### Component 模式
+
+拷贝 `build-component/micropython-guest.wasm`（约 1.4MB）用于 host composition：
+
+```bash
+# 作为 busybox 的 subcommand 插件
+wac plug ./busybox-component.wasm \
+  --plug ./micropython-guest.wasm \
+  -o composed-micropython.wasm
 ```
 
 ## 参考
