@@ -147,6 +147,16 @@ int mpy_cli_main(int argc, char **argv) {
             printf("  -c cmd     Program passed in as string\n");
             printf("  -h, --help Show this help message and exit\n");
             printf("  -V, --version Print the MicroPython version number and exit\n");
+        } else if (strcmp(argv[1], "-X") == 0) {
+            // Ignore -X options (run-tests.py compatibility)
+            if (argc > 2) {
+                // Skip both -X and its argument, then reparse
+                int ret = mpy_cli_main(argc - 2, argv + 2);
+                return ret;
+            } else {
+                fprintf(stderr, "python: -X requires an argument\n");
+                ret = 1;
+            }
         } else if (argv[1][0] == '-') {
             // Unknown option
             fprintf(stderr, "python: unknown option '%s'\n", argv[1]);
