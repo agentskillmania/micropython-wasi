@@ -204,8 +204,8 @@ int mpy_cli_main(int argc, char **argv) {
                 mp_lexer_t *lex = mp_lexer_new_from_file(qstr_from_str(argv[1]));
                 mp_parse_tree_t parse_tree = mp_parse(lex, MP_PARSE_FILE_INPUT);
                 mp_obj_t module_fun = mp_compile(&parse_tree, lex->source_name, false);
-                nlr_pop();
                 mp_call_function_0(module_fun);
+                nlr_pop();
             } else {
                 mp_obj_print_exception(&mp_plat_print, (mp_obj_t)nlr.ret_val);
                 ret = 1;
