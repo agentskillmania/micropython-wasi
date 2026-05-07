@@ -265,6 +265,126 @@ platform_tests_to_skip = {
         "basics/io_buffered_writer.py",  # needs BufferedWriter (partial IO)
         "basics/namedtuple_asdict.py",  # namedtuple._asdict (CRASH)
         "basics/string_format2.py",  # format string edge cases (CRASH)
+        # --- extmod: machine hardware (no hardware in WASI sandbox) ---
+        "extmod/machine1.py",
+        "extmod/machine_disable_irq.py",
+        "extmod/machine_hard_timer.py",
+        "extmod/machine_i2s_rate.py",
+        "extmod/machine_pinbase.py",
+        "extmod/machine_pulse.py",
+        "extmod/machine_rtc.py",
+        "extmod/machine_signal.py",
+        "extmod/machine_soft_timer.py",
+        "extmod/machine_spi_rate.py",
+        "extmod/machine_timer.py",
+        "extmod/machine_uart_irq_txidle.py",
+        "extmod/machine_uart_tx.py",
+        # --- extmod: VFS block devices / FAT / LFS (no block dev in WASI) ---
+        "extmod/vfs_blockdev.py",
+        "extmod/vfs_blockdev_invalid.py",
+        "extmod/vfs_fat_fileio1.py",
+        "extmod/vfs_fat_fileio2.py",
+        "extmod/vfs_fat_finaliser.py",
+        "extmod/vfs_fat_ilistdir_del.py",
+        "extmod/vfs_fat_more.py",
+        "extmod/vfs_fat_mtime.py",
+        "extmod/vfs_fat_oldproto.py",
+        "extmod/vfs_fat_ramdisk.py",
+        "extmod/vfs_fat_ramdisklarge.py",
+        "extmod/vfs_lfs.py",
+        "extmod/vfs_lfs_corrupt.py",
+        "extmod/vfs_lfs_error.py",
+        "extmod/vfs_lfs_file.py",
+        "extmod/vfs_lfs_ilistdir_del.py",
+        "extmod/vfs_lfs_mount.py",
+        "extmod/vfs_lfs_mtime.py",
+        "extmod/vfs_lfs_superblock.py",
+        "extmod/vfs_posix.py",  # VFS POSIX test expects specific host behavior
+        "extmod/vfs_posix_enoent.py",
+        "extmod/vfs_posix_ilistdir_del.py",
+        "extmod/vfs_posix_ilistdir_filter.py",
+        "extmod/vfs_posix_paths.py",
+        "extmod/vfs_posix_readonly.py",
+        "extmod/vfs_rom.py",
+        "extmod/vfs_userfs.py",
+        # --- extmod: websocket (needs network server) ---
+        "extmod/websocket_basic.py",
+        "extmod/websocket_toobig.py",
+        # --- extmod: select/poll (WASI poll semantics differ) ---
+        "extmod/select_ipoll.py",
+        "extmod/select_poll_basic.py",
+        "extmod/select_poll_custom.py",
+        "extmod/select_poll_eintr.py",
+        "extmod/select_poll_fd.py",
+        "extmod/select_poll_udp.py",
+        # --- extmod: socket edge cases ---
+        "extmod/socket_badconstructor.py",
+        "extmod/socket_udp_nonblock.py",
+        # --- extmod: TLS/SSL edge cases ---
+        "extmod/ssl_ioctl.py",
+        "extmod/tls_noleak.py",
+        "extmod/tls_threads.py",
+        # --- extmod: other TIMEOUT/CRASH ---
+        "extmod/asyncio_fair.py",  # TIMEOUT
+        "extmod/btree1.py",  # TIMEOUT - btree needs block device
+        "extmod/btree_closed.py",
+        "extmod/btree_error.py",
+        "extmod/btree_gc.py",
+        "extmod/cryptolib_aes128_ctr.py",  # TIMEOUT - crypto edge case
+        "extmod/deflate_compress.py",  # TIMEOUT
+        "extmod/deflate_compress_memory_error.py",  # unlimited memory
+        "extmod/deflate_stream_error.py",  # TIMEOUT
+        "extmod/framebuf1.py",  # TIMEOUT - framebuf needs display
+        "extmod/framebuf16.py",
+        "extmod/framebuf2.py",
+        "extmod/framebuf4.py",
+        "extmod/framebuf8.py",
+        "extmod/framebuf_blit.py",
+        "extmod/framebuf_bounds.py",
+        "extmod/framebuf_ellipse.py",
+        "extmod/framebuf_palette.py",
+        "extmod/framebuf_polygon.py",
+        "extmod/framebuf_scroll.py",
+        "extmod/framebuf_subclass.py",
+        "extmod/marshal_basic.py",  # CRASH - marshal not enabled
+        "extmod/marshal_micropython.py",
+        "extmod/marshal_stress.py",
+        "extmod/random_seed_default.py",  # CRASH
+        "extmod/re_debug.py",  # CRASH - re debug not enabled
+        "extmod/re_groups.py",  # CRASH
+        "extmod/re_span.py",  # CRASH
+        "extmod/re_stack_overflow.py",  # CRASH
+        "extmod/time_mktime.py",  # CRASH - mktime edge case
+        # --- micropython: native/viper (not supported in WASI) ---
+        "micropython/emg_exc.py",  # CRASH - emergency exception
+        "micropython/extreme_exc.py",  # CRASH
+        "micropython/heap_locked.py",  # CRASH
+        "micropython/heapalloc_bytesio2.py",  # CRASH
+        "micropython/heapalloc_exc_compressed_emg_exc.py",  # CRASH
+        "micropython/heapalloc_traceback.py",  # CRASH
+        "micropython/import_mpy_invalid.py",  # CRASH
+        "micropython/import_mpy_native.py",  # CRASH - native mpy
+        "micropython/import_mpy_native_gc.py",  # CRASH
+        "micropython/kbd_intr.py",  # CRASH - needs SIGINT
+        "micropython/memstats.py",  # CRASH
+        "micropython/ringio_big.py",  # CRASH
+        # --- misc: native C modules / sys.settrace ---
+        "misc/cexample_class.py",  # needs C example module (unix-specific)
+        "misc/cexample_module.py",
+        "misc/cexample_subclass.py",
+        "misc/print_exception.py",  # needs error reporting full
+        "misc/rge_sm.py",  # needs resource manager
+        "misc/sys_atexit.py",  # CRASH
+        "misc/sys_settrace_cov.py",  # needs sys.settrace
+        "misc/sys_settrace_features.py",
+        "misc/sys_settrace_generator.py",
+        "misc/sys_settrace_loop.py",
+        # --- stress: recursion limits ---
+        "stress/bytecode_limit.py",  # needs specific bytecode limit config
+        "stress/recursion.py",  # CRASH - recursion depth
+        "stress/recursive_data.py",  # CRASH
+        "stress/recursive_gen.py",  # CRASH
+        "stress/recursive_iternext.py",  # CRASH
     ),
     "WiPy": (
         "misc/print_exception.py",  # requires error reporting full
