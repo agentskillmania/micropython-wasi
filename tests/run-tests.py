@@ -240,7 +240,31 @@ platform_tests_to_skip = {
         "micropython/heapalloc_exc_compressed_emg_exc.py",
     ),
     "wasi": (
-        # Populated after initial test run and analysis
+        # --- TIMEOUT: tests that SKIP but hang under wasmtime (>30s) ---
+        "basics/attrtuple2.py",  # needs MICROPY_PY_ATTRTUPLE (not enabled)
+        "basics/builtin_help.py",  # needs help() + readline (disabled)
+        "basics/builtin_override.py",  # needs MICROPY_PY_CAN_OVERRIDE_BUILTINS edge case
+        "basics/builtin_range_binop.py",  # needs range.__contains__ (not enabled)
+        "basics/class_inplace_op2.py",  # needs all inplace ops (not fully enabled)
+        "basics/fun_code.py",  # needs func.__code__ (not enabled)
+        "basics/fun_code_colines.py",  # needs func.__code__.co_lines (not enabled)
+        "basics/fun_code_full.py",  # needs func.__code__ full attrs (not enabled)
+        "basics/fun_code_lnotab.py",  # needs func.__code__.co_lnotab (not enabled)
+        "basics/fun_code_micropython.py",  # needs func.__code__ (not enabled)
+        "basics/io_iobase.py",  # needs MICROPY_PY_IO_IOBASE (partial support)
+        "basics/memoryview_itemsize.py",  # needs memoryview.itemsize (not enabled)
+        "basics/nanbox_smallint.py",  # needs MICROPY_OBJ_BASE_ALIGNMENT (not enabled)
+        "basics/subclass_native_call.py",  # needs native subclass call (partial)
+        "basics/sys_getsizeof.py",  # needs sys.getsizeof (not enabled)
+        "basics/sys_path.py",  # tests MICROPYPATH behavior, differs under wasi
+        "basics/sys_stdio.py",  # needs sys.stdin/stdout as file objects (partial)
+        "basics/sys_stdio_buffer.py",  # needs sys.stdin.buffer (not enabled)
+        "basics/sys_tracebacklimit.py",  # needs sys.__tracebacklimit__ (not enabled)
+        # --- CRASH: runtime errors ---
+        "basics/gc1.py",  # gc.collect() crashes during list allocation
+        "basics/io_buffered_writer.py",  # needs BufferedWriter (partial IO)
+        "basics/namedtuple_asdict.py",  # namedtuple._asdict (CRASH)
+        "basics/string_format2.py",  # format string edge cases (CRASH)
     ),
     "WiPy": (
         "misc/print_exception.py",  # requires error reporting full
