@@ -124,7 +124,7 @@ PC_PLATFORMS = ("darwin", "linux", "win32")
 
 # Mapping from `sys.platform` to the port name, for special cases.
 # See `platform_to_port()` function.
-platform_to_port_map = {"pyboard": "stm32", "WiPy": "cc3200"}
+platform_to_port_map = {"pyboard": "stm32", "WiPy": "cc3200", "wasi": "wasi"}
 platform_to_port_map.update({p: "unix" for p in PC_PLATFORMS})
 
 # Tests to skip for values of the `--via-mpy` argument.
@@ -238,6 +238,9 @@ platform_tests_to_skip = {
         "micropython/emg_exc.py",
         "micropython/extreme_exc.py",
         "micropython/heapalloc_exc_compressed_emg_exc.py",
+    ),
+    "wasi": (
+        # Populated after initial test run and analysis
     ),
     "WiPy": (
         "misc/print_exception.py",  # requires error reporting full
@@ -380,6 +383,8 @@ def get_test_instance(test_instance, baudrate, user, password):
         return None
     elif test_instance == "webassembly":
         return PyboardNodeRunner()
+    elif test_instance == "wasi":
+        return WasiRuntimeRunner()
     else:
         # Assume it's a device path.
         port = convert_device_shortcut_to_real_device(test_instance)
@@ -851,6 +856,48 @@ class PyboardNodeRunner:
             output_mupy = (er.output or b"") + b"TIMEOUT"
 
         # Return the results.
+        return had_crash, output_mupy
+
+
+class WasiRuntimeRunner:
+    def __init__(self):
+        wasm = os.getenv("MICROPY_MICROPYTHON_WASM")
+        if wasm is None:
+            wasm = base_path("../ports/wasi/build/micropython.wasm")
+        else:
+            wasm = os.path.abspath(wasm)
+        self.micropython_wasm = wasm
+        self.wasmtime = os.getenv("WASMTIME", "wasmtime")
+
+    def close(self):
+        pass
+
+    def run_script_on_remote_target(self, args, test_file, is_special):
+        cwd = os.path.dirname(test_file)
+        micropypath = os.environ.get("MICROPYPATH", "")
+
+        cmdlist = [
+            self.wasmtime, "run",
+            "-W", "exceptions=y",
+            "--dir", "/::/",
+        ]
+        if micropypath:
+            cmdlist.extend(["--env", "MICROPYPATH=" + micropypath])
+        cmdlist.append(self.micropython_wasm)
+        cmdlist.append(test_file)
+
+        try:
+            had_crash = False
+            output_mupy = subprocess.check_output(
+                cmdlist, stderr=subprocess.STDOUT, timeout=TEST_TIMEOUT, cwd=cwd
+            )
+        except subprocess.CalledProcessError as er:
+            had_crash = True
+            output_mupy = er.output + b"CRASH"
+        except subprocess.TimeoutExpired as er:
+            had_crash = True
+            output_mupy = (er.output or b"") + b"TIMEOUT"
+
         return had_crash, output_mupy
 
 
@@ -1339,6 +1386,9 @@ The -t option accepts the following for the test instance:
 - webassembly - use the webassembly port of MicroPython, specified by the
   MICROPY_MICROPYTHON_MJS environment variable (which defaults to the standard
   variant of the webassembly port)
+- wasi - use the wasi port of MicroPython, specified by the
+  MICROPY_MICROPYTHON_WASM environment variable (which defaults to the
+  wasi port build), requires wasmtime to be installed
 - port:<device> - connect to and use the given serial port device
 - a<n> - connect to and use /dev/ttyACM<n>
 - u<n> - connect to and use /dev/ttyUSB<n>
