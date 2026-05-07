@@ -23,5 +23,10 @@ if [ ! -f "$MICROPY_MICROPYTHON_WASM" ]; then
     exit 1
 fi
 
+if ! command -v "${WASMTIME:-wasmtime}" >/dev/null 2>&1; then
+    echo "Error: wasmtime not found. Install it or set WASMTIME env var." >&2
+    exit 1
+fi
+
 cd "$SCRIPT_DIR/../../tests"
 exec python3 run-tests.py -t wasi "$@"

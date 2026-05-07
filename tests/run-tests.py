@@ -1532,7 +1532,7 @@ The -t option accepts the following for the test instance:
   variant of the webassembly port)
 - wasi - use the wasi port of MicroPython, specified by the
   MICROPY_MICROPYTHON_WASM environment variable (which defaults to the
-  wasi port build), requires wasmtime to be installed
+  standard variant of the wasi port), requires wasmtime to be installed
 - port:<device> - connect to and use the given serial port device
 - a<n> - connect to and use /dev/ttyACM<n>
 - u<n> - connect to and use /dev/ttyUSB<n>
