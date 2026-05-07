@@ -127,6 +127,41 @@ int mpy_cli_main(int argc, char **argv) {
     }
     #endif
 
+    // Read MICROPYPATH environment variable to populate sys.path.
+    // This is needed for run-tests.py which sets MICROPYPATH to include
+    // extmod and unittest directories. Without this, sys.path only has
+    // ["", ".frozen"] and import unittest fails.
+    {
+        char *path = getenv("MICROPYPATH");
+        if (path != NULL) {
+            // sys.path already has ["", ".frozen"] from py/runtime.c
+            // Split MICROPYPATH by ':' and append each entry
+            while (*path) {
+                if (*path == ':') {
+                    path++;
+                    continue;
+                }
+                char *entry_end = strchr(path, ':');
+                size_t entry_len;
+                if (entry_end != NULL) {
+                    entry_len = entry_end - path;
+                } else {
+                    entry_len = strlen(path);
+                }
+                if (entry_len > 0) {
+                    mp_obj_list_append(
+                        mp_sys_path,
+                        mp_obj_new_str_via_qstr(path, entry_len)
+                    );
+                }
+                path += entry_len;
+                if (*path == ':') {
+                    path++;
+                }
+            }
+        }
+    }
+
     int ret = 0;
 
     // Handle command-line arguments (CPython-compatible)
