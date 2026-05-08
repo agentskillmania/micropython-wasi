@@ -24,7 +24,7 @@ AR = $(WASI_SDK_PATH)/bin/llvm-ar
 SIZE = true
 
 # mbedTLS path (sibling project in monorepo)
-MBEDTLS_DIR = $(PWD)/../../mbedtls
+MBEDTLS_DIR = $(CURDIR)/../../mbedtls
 MBEDTLS_BUILD = $(MBEDTLS_DIR)/build-wasi
 MBEDTLS_CONFIG_FILE = \"mbedtls/mbedtls_config.h\"
 
@@ -43,14 +43,14 @@ CFLAGS += -D_WASI_EMULATED_SIGNAL
 # Override mbedTLS dir to use sibling project in monorepo
 # (must use override because extmod.mk sets MBEDTLS_DIR = lib/mbedtls)
 # Path from ports/wasi/ to sandbox/mbedtls/ is ../../../mbedtls/
-override MBEDTLS_DIR = $(PWD)/../../../mbedtls
+override MBEDTLS_DIR = $(CURDIR)/../../../mbedtls
 override MBEDTLS_CONFIG_FILE = \"mbedtls/mbedtls_config.h\"
 
 # qstr definitions (must come before including py.mk)
 QSTR_DEFS = qstrdefsport.h
 
 # Include manifest for frozen modules (asyncio)
-FROZEN_MANIFEST ?= $(PWD)/manifest.py
+FROZEN_MANIFEST ?= $(CURDIR)/manifest.py
 
 # Set a dummy micropython-lib dir to skip submodule check (asyncio is in extmod)
 MPY_LIB_DIR = $(TOP)/lib
@@ -87,7 +87,7 @@ SRC_C = \
 	modsocket.c \
 	shared/runtime/stdout_helpers.c \
 	shared/timeutils/timeutils.c \
-	$(PWD)/../../../mbedtls/wasi_entropy.c
+	$(CURDIR)/../../../mbedtls/wasi_entropy.c
 
 SRC_QSTR += $(SRC_C) $(SHARED_SRC_C)
 
@@ -109,9 +109,9 @@ $(BUILD)/micropython.wasm: $(OBJ)
 	$(Q)$(SIZE) $@
 
 run: $(BUILD)/micropython.wasm
-	wasmtime run $< --mapdir /::$(PWD)
+	wasmtime run $< --mapdir /::$(CURDIR)
 
 test: $(BUILD)/micropython.wasm
-	/usr/bin/printf "print('hello world!', list(x+1 for x in range(10)), end='eol\\n')\r\n\004" | wasmtime run $< --mapdir /::$(PWD) | tail -n2 | grep "^hello world! \[1, 2, 3, 4, 5, 6, 7, 8, 9, 10\]eol"
+	/usr/bin/printf "print('hello world!', list(x+1 for x in range(10)), end='eol\\n')\r\n\004" | wasmtime run $< --mapdir /::$(CURDIR) | tail -n2 | grep "^hello world! \[1, 2, 3, 4, 5, 6, 7, 8, 9, 10\]eol"
 
 include $(TOP)/py/mkrules.mk

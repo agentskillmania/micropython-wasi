@@ -202,4 +202,4 @@ typedef long mp_off_t;
 #define MP_STATE_PORT MP_STATE_VM
 
 // Stack/gc configuration
-#define MICROPY_HEAP_SIZE (256 * 1024)
+#define MICROPY_HEAP_SIZE (4 * 1024 * 1024)
