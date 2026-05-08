@@ -115,8 +115,8 @@
 
 // ==== Level 2: 非REPL功能 (逐个添加) ====
 // 跳过的REPL功能: 29-34 (EMACS_KEYS, AUTO_INDENT, INPUT, HELP, HELP_MODULES, PS1_PS2)
-// 跳过 35: SYS_STDFILES (有qstr冲突)
-// 跳过 36: SYS_STDIO_BUFFER (依赖35)
+#define MICROPY_PY_SYS_STDFILES          (1)  // 35: sys.stdin/stdout/stderr as file objects
+// 跳过 36: SYS_STDIO_BUFFER (暂不需要)
 #define MICROPY_PY_SYS_MAXSIZE              (1)  // 37: sys.maxsize
 #define MICROPY_ENABLE_SCHEDULER            (1)  // 38: 调度器支持
 // 跳过 39: STACK_CHECK (WASI环境下卡死)
