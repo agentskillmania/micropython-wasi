@@ -3,6 +3,7 @@
  *
  * Converts WIT python interface args to argc/argv and calls mpy_cli_main.
  * Sets the guest's working directory from the host-provided cwd before execution.
+ * Redirects stdout/stdin if the host provides file paths (for pipeline/redirect support).
  * This allows MicroPython to be composed into a host runner (e.g. busybox-wasi)
  * via the agentskillmania:subcommand/python interface.
  */
@@ -12,12 +13,14 @@
 #include <string.h>
 #include <unistd.h>
 
-/* Forward declaration — MicroPython CLI entry (defined in main.c) */
+/* Forward declaration -- MicroPython CLI entry (defined in main.c) */
 extern int mpy_cli_main(int argc, char **argv);
 
 int32_t exports_agentskillmania_subcommand_python_execute(
     guest_python_string_t *cwd,
-    guest_python_list_string_t *args)
+    guest_python_list_string_t *args,
+    guest_python_string_t *stdout_file,
+    guest_python_string_t *stdin_file)
 {
     /* Sync guest cwd with host */
     if (cwd->len > 0) {
@@ -26,6 +29,28 @@ int32_t exports_agentskillmania_subcommand_python_execute(
             memcpy(s, cwd->ptr, cwd->len);
             s[cwd->len] = '\0';
             chdir(s);
+            free(s);
+        }
+    }
+
+    /* Redirect stdout if host requests it (for pipelines/redirects) */
+    if (stdout_file->len > 0) {
+        char *s = malloc(stdout_file->len + 1);
+        if (s) {
+            memcpy(s, stdout_file->ptr, stdout_file->len);
+            s[stdout_file->len] = '\0';
+            freopen(s, "w", stdout);
+            free(s);
+        }
+    }
+
+    /* Redirect stdin if host requests it (for pipeline input) */
+    if (stdin_file->len > 0) {
+        char *s = malloc(stdin_file->len + 1);
+        if (s) {
+            memcpy(s, stdin_file->ptr, stdin_file->len);
+            s[stdin_file->len] = '\0';
+            freopen(s, "r", stdin);
             free(s);
         }
     }

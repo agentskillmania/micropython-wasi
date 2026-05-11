@@ -3,15 +3,17 @@ package agentskillmania:subcommand;
 /// Sub-command interface for git (libgit2 CLI).
 interface git {
     /// Execute with args. Host passes its cwd; guest chdir()s before running.
+    /// stdout-file/stdin-file: paths to redirect I/O (empty string = no redirect).
     /// Returns the process exit code (0 = success, non-zero = failure).
-    execute: func(cwd: string, args: list<string>) -> s32;
+    execute: func(cwd: string, args: list<string>, stdout-file: string, stdin-file: string) -> s32;
 }
 
 /// Sub-command interface for python (MicroPython).
 interface python {
     /// Execute with args. Host passes its cwd; guest chdir()s before running.
+    /// stdout-file/stdin-file: paths to redirect I/O (empty string = no redirect).
     /// Returns the process exit code (0 = success, non-zero = failure).
-    execute: func(cwd: string, args: list<string>) -> s32;
+    execute: func(cwd: string, args: list<string>, stdout-file: string, stdin-file: string) -> s32;
 }
 
 /// World for a host component that consumes sub-commands.
