@@ -81,8 +81,21 @@ int exec_python_code(const char *code) {
         }
         return 0;
     } else {
-        // 发生异常，打印异常信息
-        mp_obj_print_exception(&mp_plat_print, (mp_obj_t)nlr.ret_val);
+        // Handle SystemExit specially — extract exit code
+        mp_obj_t exc = (mp_obj_t)nlr.ret_val;
+        bool is_sys_exit = mp_obj_is_obj(exc) &&
+            ((mp_obj_base_t *)MP_OBJ_TO_PTR(exc))->type == &mp_type_SystemExit;
+        if (is_sys_exit) {
+            mp_obj_t exit_val = mp_obj_exception_get_value(exc);
+            mp_int_t code = 0;
+            if (exit_val != mp_const_none &&
+                mp_obj_get_int_maybe(exit_val, &code)) {
+                return (int)code;
+            }
+            return 0;
+        }
+        // Other exceptions: print traceback and return 1
+        mp_obj_print_exception(&mp_plat_print, exc);
         return 1;
     }
 }
@@ -104,11 +117,7 @@ int mpy_cli_main(int argc, char **argv) {
     // 初始化 MicroPython
     mp_init();
 
-    // 设置 sys.argv (参考 unix port 的 set_sys_argv)
-    mp_obj_list_init(MP_OBJ_TO_PTR(mp_sys_argv), 0);
-    for (int i = 0; i < argc; i++) {
-        mp_obj_list_append(mp_sys_argv, MP_OBJ_NEW_QSTR(qstr_from_str(argv[i])));
-    }
+    // sys.argv populated later after argument parsing (CPython-compatible).
 
     /*
      * 挂载 POSIX 文件系统
@@ -158,6 +167,39 @@ int mpy_cli_main(int argc, char **argv) {
                 if (*path == ':') {
                     path++;
                 }
+            }
+        }
+    }
+
+    // Set sys.argv — CPython-compatible:
+    //   python -c "code" arg1 arg2 → sys.argv = ['-c', 'arg1', 'arg2']
+    //   python script.py arg1      → sys.argv = ['script.py', 'arg1']
+    //   python --version           → sys.argv = ['--version']
+    mp_obj_list_init(MP_OBJ_TO_PTR(mp_sys_argv), 0);
+    {
+        int skip = 1; // skip argv[0] (program name)
+        // Skip -X options
+        int tmp_argc = argc;
+        char **tmp_argv = argv;
+        while (tmp_argc > 1 && strcmp(tmp_argv[1], "-X") == 0 && tmp_argc > 2) {
+            skip += 2;
+            tmp_argc -= 2;
+            tmp_argv += 2;
+        }
+        if (tmp_argc > 1 && strcmp(tmp_argv[1], "-c") == 0) {
+            // -c mode: sys.argv = ['-c', ...extra args after code...]
+            mp_obj_list_append(mp_sys_argv,
+                MP_OBJ_NEW_QSTR(qstr_from_str("-c")));
+            // Skip the code string itself, add remaining args
+            for (int i = skip + 2; i < argc; i++) {
+                mp_obj_list_append(mp_sys_argv,
+                    MP_OBJ_NEW_QSTR(qstr_from_str(argv[i])));
+            }
+        } else {
+            // Default: sys.argv = argv[skip:]
+            for (int i = skip; i < argc; i++) {
+                mp_obj_list_append(mp_sys_argv,
+                    MP_OBJ_NEW_QSTR(qstr_from_str(argv[i])));
             }
         }
     }
